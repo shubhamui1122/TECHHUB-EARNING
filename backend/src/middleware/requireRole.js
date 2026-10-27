@@ -1,4 +1,3 @@
-
 function requireRole(...allowedRoles) {
   return function (req, res, next) {
     if (!req.user) {
@@ -13,8 +12,8 @@ function requireRole(...allowedRoles) {
       });
     }
 
-    next();
+    return next();
   };
 }
 
-module.exports = requireRole;
+module.exports = { requireRole };
