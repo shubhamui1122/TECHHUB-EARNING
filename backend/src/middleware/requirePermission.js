@@ -1,47 +1,40 @@
+const { pool } = require("../db");
 
-const { query } = require("../db");
-
-function requirePermission(...allowedPermissions) {
+function requirePermission(permission) {
   return async function (req, res, next) {
+    if (!req.user) {
+      return res.status(401).json({
+        error: "Please log in first."
+      });
+    }
+
+    if (req.user.role === "owner") {
+      return next();
+    }
+
+    if (req.user.role !== "admin") {
+      return res.status(403).json({
+        error: "Admin access required."
+      });
+    }
+
     try {
-      if (!req.user) {
-        return res.status(401).json({
-          error: "Please log in first."
-        });
-      }
-
-      // Owner पर Admin permissions लागू नहीं होंगी।
-      if (req.user.role === "owner") {
-        return next();
-      }
-
-      if (req.user.role !== "admin") {
-        return res.status(403).json({
-          error: "Admin access required."
-        });
-      }
-
-      if (allowedPermissions.length === 0) {
-        return res.status(403).json({
-          error: "No permission specified."
-        });
-      }
-
-      const result = await query(
-        `SELECT permission
+      const result = await pool.query(
+        `SELECT 1
          FROM admin_permissions
          WHERE admin_id = $1
-           AND permission = ANY($2::text[])`,
-        [req.user.id, allowedPermissions]
+           AND permission = $2
+         LIMIT 1`,
+        [req.user.id, permission]
       );
 
-      if (result.rows.length === 0) {
+      if (result.rowCount === 0) {
         return res.status(403).json({
-          error: "You do not have the required permission."
+          error: "You do not have this permission."
         });
       }
 
-      next();
+      return next();
     } catch (error) {
       console.error("Permission check failed:", error.message);
 
@@ -52,4 +45,4 @@ function requirePermission(...allowedPermissions) {
   };
 }
 
-module.exports = requirePermission;
+module.exports = { requirePermission };
