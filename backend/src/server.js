@@ -1,21 +1,20 @@
-
 require("dotenv").config();
 
 const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
+const authRoutes = require("./auth");
 
 const app = express();
 const PORT = Number(process.env.PORT) || 5000;
 
 if (!process.env.SESSION_SECRET) {
-  console.error("Missing SESSION_SECRET in backend environment.");
+  console.error("Missing SESSION_SECRET in environment.");
   process.exit(1);
 }
 
 app.disable("x-powered-by");
-
 app.use(helmet());
 
 app.use(
@@ -40,17 +39,28 @@ app.use(
 app.get("/", (req, res) => {
   res.json({
     name: "TechHub Earning API",
-    message: "Backend is running",
     status: "ok"
   });
 });
 
-app.get("/api/health", (req, res) => {
-  res.status(200).json({
-    status: "ok",
-    service: "techhub-earning-backend"
-  });
+app.get("/api/health", async (req, res) => {
+  try {
+    const { checkDatabase } = require("./db");
+    await checkDatabase();
+
+    res.json({
+      status: "ok",
+      database: "connected"
+    });
+  } catch (error) {
+    res.status(503).json({
+      status: "error",
+      database: "unavailable"
+    });
+  }
 });
+
+app.use("/api/auth", authRoutes);
 
 app.use((req, res) => {
   res.status(404).json({
@@ -61,9 +71,7 @@ app.use((req, res) => {
 app.use((err, req, res, next) => {
   console.error("Server error:", err.message);
 
-  if (res.headersSent) {
-    return next(err);
-  }
+  if (res.headersSent) return next(err);
 
   res.status(500).json({
     error: "Internal server error"
