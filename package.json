@@ -1,0 +1,15 @@
+
+{
+  "name": "techhub-earning",
+  "version": "1.0.0",
+  "private": true,
+  "description": "TechHub Earning platform",
+  "scripts": {
+    "dev": "concurrently \"npm run dev --prefix backend\" \"npm run dev --prefix frontend\"",
+    "server": "npm run dev --prefix backend",
+    "client": "npm run dev --prefix frontend"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
+}
