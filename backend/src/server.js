@@ -4,7 +4,9 @@ const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
+
 const authRoutes = require("./auth");
+const adminRoutes = require("./admin");
 
 const app = express();
 const PORT = Number(process.env.PORT) || 5000;
@@ -15,6 +17,7 @@ if (!process.env.SESSION_SECRET) {
 }
 
 app.disable("x-powered-by");
+
 app.use(helmet());
 
 app.use(
@@ -26,6 +29,7 @@ app.use(
 
 app.use(express.json({ limit: "1mb" }));
 
+// General API rate limit
 app.use(
   "/api",
   rateLimit({
@@ -36,6 +40,7 @@ app.use(
   })
 );
 
+// Health check
 app.get("/", (req, res) => {
   res.json({
     name: "TechHub Earning API",
@@ -53,6 +58,8 @@ app.get("/api/health", async (req, res) => {
       database: "connected"
     });
   } catch (error) {
+    console.error("Database health check failed:", error.message);
+
     res.status(503).json({
       status: "error",
       database: "unavailable"
@@ -60,24 +67,52 @@ app.get("/api/health", async (req, res) => {
   }
 });
 
+// Authentication routes
 app.use("/api/auth", authRoutes);
 
+// Admin management routes
+// Owner-only access is enforced inside admin.js
+app.use("/api/admin", adminRoutes);
+
+// Unknown routes
 app.use((req, res) => {
   res.status(404).json({
     error: "Route not found"
   });
 });
 
+// Central error handler
 app.use((err, req, res, next) => {
   console.error("Server error:", err.message);
 
-  if (res.headersSent) return next(err);
+  if (res.headersSent) {
+    return next(err);
+  }
 
   res.status(500).json({
     error: "Internal server error"
   });
 });
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`TechHub Earning API running on port ${PORT}`);
 });
+
+// Graceful shutdown
+async function shutdown() {
+  console.log("Shutting down TechHub Earning API...");
+
+  server.close(async () => {
+    try {
+      const { pool } = require("./db");
+      await pool.end();
+      process.exit(0);
+    } catch (error) {
+      console.error("Shutdown error:", error.message);
+      process.exit(1);
+    }
+  });
+}
+
+process.on("SIGTERM", shutdown);
+process.on("SIGINT", shutdown);
